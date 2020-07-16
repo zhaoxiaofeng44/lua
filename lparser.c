@@ -1060,6 +1060,16 @@ static void funcargs (LexState *ls, expdesc *f, int line) {
 
 
 /*
+ ** {======================================================================
+ ** Rules for class
+ ** =======================================================================
+ */
+
+
+
+
+
+/*
 ** {======================================================================
 ** Expression parsing
 ** =======================================================================
@@ -1819,6 +1829,85 @@ static void funcstat (LexState *ls, int line) {
   luaK_fixline(ls->fs, line);  /* definition "happens" in the first line */
 }
 
+static int classname (LexState *ls, expdesc *v) {
+    /* classname -> NAME {NAME} [':' NAME] */
+    int issuper = 0;
+    singlevar(ls, v);
+    if (ls->t.token == ':') {
+        issuper = 1;
+        fieldsel(ls, v);
+    }
+    return issuper;
+}
+
+
+static int funcname2 (LexState *ls, expdesc *v) {
+    /* funcname -> NAME {fieldsel} [':' NAME] */
+    int ismethod = 0;
+    singlevar(ls, v);
+    while (ls->t.token == '.')
+        fieldsel(ls, v);
+    if (ls->t.token == ':') {
+        ismethod = 1;
+        fieldsel(ls, v);
+    }
+    return ismethod;
+}
+
+
+static void funcstat2 (LexState *ls, int line) {
+    /* funcstat -> FUNCTION funcname body */
+    int ismethod;
+    expdesc v, b;
+    luaX_next(ls);  /* skip FUNCTION */
+    ismethod = 0;
+    singlevar(ls, &v);
+    fieldsel(ls, &v);
+    body(ls, &b, ismethod, line);
+    luaK_storevar(ls->fs, &v, &b);
+    luaK_fixline(ls->fs, line);  /* definition "happens" in the first line */
+}
+
+
+static void constructor2 (LexState *ls, expdesc *t) {
+    /* constructor -> '{' [ field { sep field } [sep] ] '}'
+     sep -> ',' | ';' */
+    FuncState *fs = ls->fs;
+    int line = ls->linenumber;
+    int pc = luaK_codeABC(fs, OP_NEWTABLE, 0, 0, 0);
+    ConsControl cc;
+    luaK_code(fs, 0);  /* space for extra arg. */
+    cc.na = cc.nh = cc.tostore = 0;
+    cc.t = t;
+    init_exp(t, VNONRELOC, fs->freereg);  /* table will be at stack top */
+    luaK_reserveregs(fs, 1);
+    init_exp(&cc.v, VVOID, 0);  /* no value (yet) */
+    checknext(ls, '{');
+//    do {
+//        lua_assert(cc.v.k == VVOID || cc.tostore > 0);
+//        if (ls->t.token == '}') break;
+//        closelistfield(fs, &cc);
+//        field(ls, &cc);
+//    } while (testnext(ls, ',') || testnext(ls, ';'));
+    
+    funcstat2(ls,line);
+    check_match(ls, '}', '{', line);
+    lastlistfield(fs, &cc);
+    luaK_settablesize(fs, pc, t->u.info, cc.na, cc.nh);
+}
+
+
+
+static void classstat (LexState *ls, int line) {
+    /* class ->  '(' parlist ')' block END */
+    int issuper;
+    expdesc v, b;
+    luaX_next(ls);  /* skip FUNCTION */
+    issuper = classname(ls, &v);
+    constructor2(ls, &b);
+    luaK_storevar(ls->fs, &v, &b);
+    luaK_fixline(ls->fs, line);  /* definition "happens" in the first line */
+}
 
 static void exprstat (LexState *ls) {
   /* stat -> func | assignment */
@@ -1902,6 +1991,10 @@ static void statement (LexState *ls) {
     }
     case TK_FUNCTION: {  /* stat -> funcstat */
       funcstat(ls, line);
+      break;
+    }
+    case TK_CLASS: {  /* stat -> class */
+      classstat(ls, line);
       break;
     }
     case TK_LOCAL: {  /* stat -> localstat */

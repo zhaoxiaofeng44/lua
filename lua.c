@@ -616,7 +616,7 @@ static int pmain (lua_State *L) {
 }
 
 
-int main (int argc, char **argv) {
+int main22 (int argc, char **argv) {
   int status, result;
   lua_State *L = luaL_newstate();  /* create state */
   if (L == NULL) {
@@ -631,5 +631,43 @@ int main (int argc, char **argv) {
   report(L, status);
   lua_close(L);
   return (result && status == LUA_OK) ? EXIT_SUCCESS : EXIT_FAILURE;
+}
+
+
+int main223 (int argc, char **argv) {
+    
+    lua_State *L = luaL_newstate();
+    luaL_openlibs(L);
+      luaL_dostring(L,"class ttt { function add(x,y) end }  return 55  end");
+    int sum= 0;
+    
+    int x = 1;
+    int y = 2;
+    lua_getglobal(L,"add");
+    
+    lua_pushnumber(L,x);
+    
+    lua_pushnumber(L,y);
+    
+    lua_call(L,2,1);
+    
+    sum = (int)lua_tointeger(L,-1);
+    lua_pop(L,-1);
+
+    return 1;
+}
+
+
+
+
+int main334 (int argc, char **argv) {
+    
+    lua_State *L = luaL_newstate();
+    luaL_openlibs(L);
+  
+      luaL_dofile(L,"/Users/zhaoxiaofeng/Downloads/lua-master/luafile.lua");
+
+    
+    return 1;
 }
 
