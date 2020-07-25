@@ -99,7 +99,7 @@ local source = [[
         var yy = 45
 
         function ctor(rr,cc){
-            this.xx = rr + 22;
+            this.xx = ((rr + 22) + 4) & 44 !=5;
             this.yy = cc;
         }
 
@@ -122,7 +122,7 @@ local SPECIAL_CHAR_LF = string.byte("\n",1)
 -- local SPECIAL_CHAR_AND = string.byte('@',1)
 
 
-local charstats = {"\\","\"",":",";","{","}","(",")","=",".",",","+","-","*","/","%"}
+local charstats = {"\\","\"",":",";","{","}","(",")","=",".",",","+","-","*","/","%","&","|",">","<","!"}
 local tokenstats = {"class","var","function","self","super"}
 
 function isnumber(charcode)
@@ -291,6 +291,7 @@ function lexer:operatesegment()
         or self.token:test("<")
     then
         local v = self.token:nextvalue().name
+        print("zzzzz >>>>>>> "..v)
         if self.token:test("&") 
             or self.token:test("|") 
             or self.token:test(">") 
@@ -337,19 +338,15 @@ end
 
 function lexer:expressionsegment()
 
-    local v
-    if self.token:test("name") then
-        v = self:namesegment()
-    elseif self.token:test("name") or self.token:test("number") then
-        v = self.token:nextvalue().name
-    end
+    local v = self:valuesegment()
     if v then
         local o = self:operatesegment()
         while o do
-            print("zzzzzz ' "..v.."   " ..o)
+            print("zzzzzzeeeee "..v.."   " ..o)
             v = v .. o .. self:valuesegment()
             o = self:operatesegment()
         end
+        print("zzzzzzeeeeettt "..v)
         return v
     end 
 end
@@ -383,7 +380,7 @@ function lexer:funcsegment(isclass)
         self.token:next()
         while not self.token:test("}") do
             body[#body + 1] = self:assignsegment()
-            print(">>>>>>>body "..body[#body])
+            --print(">>>>>>>body "..body[#body])
         end
         self.token:next()
         return "function(".. strjoin(args,",")..")"..strjoin(body,"").."end",funcname
@@ -420,8 +417,10 @@ end
 
 function lexer:valuesegment(isclass)
 
-    if self.token:test("number") or self.token:test("name") then
-        return self:expressionsegment()
+    if self.token:test("name") then
+        return self:namesegment()
+    elseif self.token:test("number") then
+        return self.token:nextvalue().name
     elseif self.token:test("\"") then
         local vv =  self:stringsegment()
         if self.token:test(".") then
@@ -433,9 +432,10 @@ function lexer:valuesegment(isclass)
         return vv
     elseif self.token:test("(") then
         self.token:next()
-        local vv = self:valuesegment()
+        local vv = self:expressionsegment()
         self.token:next()
-        return "(" .. v .. ")"
+        print("?>>>>>>>vvvvvvvvvvvvvvvvvv "..vv.."   " ..self.token:get().name)
+        return "(" .. vv .. ")"
     elseif self.token:test("{") then
         local vv = "{"
         self.token:next() 
@@ -457,7 +457,7 @@ function lexer:assignsegment()
     local assign = null;
     if self.token:test("var") then
         self.token:next();
-        assign =  "local " .. self.token:nextvalue().name..self.token:nextvalue().name..self:valuesegment()..";"
+        assign =  "local " .. self.token:nextvalue().name..self.token:nextvalue().name..self:expressionsegment()..";"
     elseif self.token:test("function") then
         local funcbody,funcname = self:valuesegment(false)
         assign = "local " ..funcname .. "="..funcbody
@@ -467,7 +467,7 @@ function lexer:assignsegment()
     elseif self.token:test("name") then
         local name = self:namesegment()
         print("tttuuuuuuuu >>>  "..name)
-        assign =  name..self.token:nextvalue().name..self:valuesegment()..";"
+        assign =  name..self.token:nextvalue().name..self:expressionsegment()..";"
     end
 
     self:skip(";")
